@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Send your photo to Dadrwal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- EmailJS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script>
+  emailjs.init("loal57XQBlOu6Wzww"); // Your EmailJS public key
+</script>
+
+<style>
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #0f0f14;
+  color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.container {
+  width: 360px;
+  background: #1c1c25;
+  padding: 20px;
+  border-radius: 18px;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+  text-align: center;
+}
+
+h2 {
+  margin-bottom: 10px;
+}
+
+video, img {
+  width: 100%;
+  border-radius: 12px;
+  margin-top: 10px;
+}
+
+textarea {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  resize: none;
+  font-size: 14px;
+  color: #fff;
+  background: #2b2b38;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.open { background: #4caf50; color: white; }
+.capture { background: #2196f3; color: white; }
+
+.success {
+  display: none;
+  margin-top: 10px;
+  background: #00c853;
+  padding: 10px;
+  border-radius: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h2>📷 Send your photo to Dadrwal</h2>
+
+  <video id="video" autoplay playsinline></video>
+  <img id="preview" style="display:none;">
+
+  <textarea id="message" rows="3">image is send through your site</textarea>
+
+  <button class="open" onclick="startCamera()">Open Camera</button>
+  <button class="capture" onclick="captureAndUpload()">Capture & Send</button>
+
+  <div class="success" id="success">✅ Photo sent successfully!</div>
+</div>
+
+<canvas id="canvas" style="display:none;"></canvas>
+
+<script>
+let video = document.getElementById("video");
+let canvas = document.getElementById("canvas");
+let preview = document.getElementById("preview");
+let successBox = document.getElementById("success");
+
+// Start camera with environment (back) camera
+function startCamera() {
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => video.srcObject = stream)
+    .catch(() => alert("Camera access denied"));
+}
+
+// Capture photo and upload
+function captureAndUpload() {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+
+  canvas.toBlob(blob => uploadToCloudinary(blob), "image/jpeg", 0.95);
+}
+
+// Upload to Cloudinary
+function uploadToCloudinary(blob) {
+  let formData = new FormData();
+  formData.append("file", blob);
+  formData.append("upload_preset", "GitHub");
+
+  fetch("https://api.cloudinary.com/v1_1/dikshit/image/upload", {
+    method: "POST",
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    preview.src = data.secure_url;
+    preview.style.display = "block";
+    sendEmail(data.secure_url); // Send email after successful upload
+  })
+  .catch(() => alert("Cloud upload failed"));
+}
+
+// Send Email using EmailJS built-in contact_form template
+function sendEmail(photoURL) {
+  const userMessage = document.getElementById("message").value;
+  const timestamp = new Date().toLocaleString();
+
+  const messageBody = `Photo URL: ${photoURL}\nMessage: ${userMessage}`;
+
+  emailjs.send("service_5deh0ce", "contact_form", {
+    name: "Photo Upload Page",
+    time: timestamp,
+    message: messageBody
+  })
+  .then(() => {
+    successBox.style.display = "block";
+    setTimeout(() => {
+      successBox.style.display = "none";
+      preview.style.display = "none";
+      document.getElementById("message").value = "image is send through your site";
+    }, 2000);
+  })
+  .catch(() => alert("Email send failed"));
+}
+</script>
+
+</body>
+</html>
