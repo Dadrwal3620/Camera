@@ -2,136 +2,186 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Send your photo to Dadrwal</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Send Photo to Dadrwal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
 <style>
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
-  background: #0f0f14;
-  color: #fff;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.container {
-  width: 360px;
-  background: #1c1c25;
-  padding: 20px;
-  border-radius: 18px;
-  box-shadow: 0 25px 50px rgba(0,0,0,0.6);
-  text-align: center;
+body{
+    background:#000;
+    height:100vh;
+    overflow:hidden;
 }
 
-h2 {
-  margin-bottom: 12px;
+/* FULLSCREEN CAMERA */
+#cameraScreen{
+    position:fixed;
+    inset:0;
+    background:#000;
+    display:none;
 }
 
-video, img {
-  width: 100%;
-  border-radius: 12px;
-  margin-top: 10px;
+video{
+    width:100vw;
+    height:100vh;
+    object-fit:cover;
 }
 
-button {
-  width: 100%;
-  padding: 12px;
-  margin-top: 10px;
-  border: none;
-  border-radius: 10px;
-  font-size: 16px;
-  cursor: pointer;
+/* TOP BAR */
+.top-bar{
+    position:absolute;
+    top:15px;
+    width:100%;
+    text-align:center;
+    color:#fff;
+    font-size:18px;
+    font-weight:600;
+    z-index:5;
 }
 
-.open { background: #4caf50; color: white; }
-.capture { background: #2196f3; color: white; }
-.send { background: #ff9800; color: black; }
-.success {
-  display: none;
-  margin-top: 10px;
-  background: #00c853;
-  padding: 10px;
-  border-radius: 10px;
+/* BOTTOM CONTROLS */
+.controls{
+    position:absolute;
+    bottom:30px;
+    width:100%;
+    display:flex;
+    justify-content:center;
+    gap:20px;
+    z-index:5;
+}
+
+button{
+    border:none;
+    padding:14px 26px;
+    border-radius:30px;
+    font-size:16px;
+    cursor:pointer;
+}
+
+.open{
+    background:#00e676;
+    color:#000;
+}
+
+.capture{
+    background:#2196f3;
+    color:#fff;
+}
+
+.send{
+    background:#ff9800;
+    color:#000;
+}
+
+/* PREVIEW SCREEN */
+#previewScreen{
+    position:fixed;
+    inset:0;
+    background:#0f0f14;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+}
+
+#previewScreen img{
+    width:100%;
+    max-width:420px;
+    border-radius:18px;
+    box-shadow:0 20px 50px rgba(0,0,0,.6);
+}
+
+.success{
+    margin-top:15px;
+    background:#00c853;
+    color:#000;
+    padding:12px 20px;
+    border-radius:14px;
+    display:none;
+    font-weight:600;
 }
 </style>
 </head>
 
 <body>
 
-<div class="container">
-  <h2>📷 Send your photo to Dadrwal</h2>
+<!-- CAMERA SCREEN -->
+<div id="cameraScreen">
+    <div class="top-bar">📷 Capture your photo</div>
+    <video id="video" autoplay playsinline></video>
+    <div class="controls">
+        <button class="capture" id="captureBtn">Capture</button>
+    </div>
+</div>
 
-  <video id="video" autoplay playsinline></video>
-  <img id="preview" style="display:none;">
+<!-- PREVIEW SCREEN -->
+<div id="previewScreen">
+    <img id="preview">
+    <button class="send" id="sendBtn">Send Image</button>
+    <div class="success" id="successMsg">✅ Image sent successfully</div>
+</div>
 
-  <button class="open" onclick="startCamera()">Open Camera</button>
-  <button class="capture" onclick="capturePhoto()">Capture</button>
-  <button class="send" onclick="uploadImage()" style="display:none;">Send Image</button>
-
-  <div class="success" id="success">✅ Image uploaded successfully!</div>
+<!-- START BUTTON -->
+<div id="startScreen" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f0f14;">
+    <button class="open" id="openCamera">Open Camera</button>
 </div>
 
 <canvas id="canvas" style="display:none;"></canvas>
 
 <script>
-let video = document.getElementById("video");
-let canvas = document.getElementById("canvas");
-let preview = document.getElementById("preview");
-let sendBtn = document.querySelector(".send");
-let successBox = document.getElementById("success");
-let imageBlob = null;
+const openCameraBtn = document.getElementById("openCamera");
+const cameraScreen = document.getElementById("cameraScreen");
+const previewScreen = document.getElementById("previewScreen");
+const video = document.getElementById("video");
+const captureBtn = document.getElementById("captureBtn");
+const preview = document.getElementById("preview");
+const sendBtn = document.getElementById("sendBtn");
+const successMsg = document.getElementById("successMsg");
+const canvas = document.getElementById("canvas");
 
-// Start camera
-function startCamera() {
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-    .then(stream => video.srcObject = stream)
-    .catch(() => alert("Camera access denied"));
-}
+let stream;
 
-// Capture image
-function capturePhoto() {
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
+// OPEN CAMERA (FRONT PRIORITY)
+openCameraBtn.onclick = async () => {
+    document.getElementById("startScreen").style.display = "none";
+    cameraScreen.style.display = "block";
 
-  canvas.toBlob(blob => {
-    imageBlob = blob;
-    preview.src = URL.createObjectURL(blob);
-    preview.style.display = "block";
-    sendBtn.style.display = "block";
-  }, "image/jpeg", 0.95);
-}
+    stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio:false
+    });
 
-// Upload to Cloudinary
-function uploadImage() {
-  if (!imageBlob) return alert("No image captured");
+    video.srcObject = stream;
+};
 
-  let formData = new FormData();
-  formData.append("file", imageBlob);
-  formData.append("upload_preset", "GitHub");
+// CAPTURE PHOTO
+captureBtn.onclick = () => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-  fetch("https://api.cloudinary.com/v1_1/dikshit/image/upload", {
-    method: "POST",
-    body: formData
-  })
-  .then(res => res.json())
-  .then(() => {
-    successBox.style.display = "block";
-    setTimeout(resetPage, 2000);
-  })
-  .catch(() => alert("Upload failed"));
-}
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0);
 
-// Reset page
-function resetPage() {
-  preview.style.display = "none";
-  sendBtn.style.display = "none";
-  successBox.style.display = "none";
-  imageBlob = null;
-}
+    preview.src = canvas.toDataURL("image/jpeg", 1.0);
+
+    // stop camera
+    stream.getTracks().forEach(t => t.stop());
+
+    cameraScreen.style.display = "none";
+    previewScreen.style.display = "flex";
+};
+
+// SEND IMAGE (placeholder)
+sendBtn.onclick = () => {
+    successMsg.style.display = "block";
+};
 </script>
 
 </body>
